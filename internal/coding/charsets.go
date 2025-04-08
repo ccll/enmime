@@ -208,6 +208,7 @@ var encodings = map[string]struct {
 	"iso-ir-58":           {simplifiedchinese.GBK, "gbk"},
 	"x-gbk":               {simplifiedchinese.GBK, "gbk"},
 	"gb18030":             {simplifiedchinese.GB18030, "gb18030"},
+	"gb-18030":            {simplifiedchinese.GB18030, "gb18030"},
 	"hz-gb-2312":          {simplifiedchinese.HZGB2312, "hz-gb-2312"},
 	"big5":                {traditionalchinese.Big5, "big5"},
 	"big5-hkscs":          {traditionalchinese.Big5, "big5"},

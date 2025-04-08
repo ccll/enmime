@@ -3,8 +3,14 @@ package textproto
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math"
 	"net/textproto"
+	"sort"
+	"strings"
+
+	"github.com/jhillyerd/enmime/v2/internal/coding"
+	"github.com/saintfish/chardet"
 )
 
 // ReadEmailMIMEHeader reads a MIME-style header from r.
@@ -13,6 +19,59 @@ import (
 // we must support in email, instead of just HTTP.
 func (r *Reader) ReadEmailMIMEHeader() (MIMEHeader, error) {
 	return readEmailMIMEHeader(r, math.MaxInt64)
+}
+
+var charsetPriority = map[string]int{
+	"gb-18030":  1,
+	"big5":      2,
+	"euc-jp":    3,
+	"euc-kr":    4,
+	"shift_jis": 5,
+	"utf-8":     6,
+}
+
+func DetectAndConvertToUTF8(data []byte) string {
+	// Many real world emails put raw non-ASCII non-MIME encoded text in headers.
+	// Simply treat them as UTF-8 would create garbaled text, we should try to
+	// detect the charset and convert them to UTF-8 encoding.
+	detector := chardet.NewTextDetector()
+	detected, err := detector.DetectAll(data)
+	if err != nil {
+		fmt.Printf("Failed to detect charset: %v, %s\n", err, string(data))
+		return string(data)
+	}
+
+	// For CJK charsets, chardet often return same confidence for multiple charsets.
+	// We want Chinese to come before Japanese and Korean.
+	sort.Slice(detected, func(i, j int) bool {
+		// First sort by confidence.
+		if detected[i].Confidence != detected[j].Confidence {
+			return detected[i].Confidence > detected[j].Confidence
+		}
+
+		// Then sort by charset priority.
+		var firstPriority, secondPriority int
+		firstPriority, ok := charsetPriority[strings.ToLower(detected[i].Charset)]
+		if !ok {
+			firstPriority = math.MaxInt32
+		}
+		secondPriority, ok = charsetPriority[strings.ToLower(detected[j].Charset)]
+		if !ok {
+			secondPriority = math.MaxInt32
+		}
+		return firstPriority < secondPriority
+	})
+
+	// fmt.Printf("Detected charsets: %v, %s\n", detected, string(data))
+
+	for _, result := range detected {
+		utf8, err := coding.ConvertToUTF8String(result.Charset, data)
+		if err == nil {
+			return utf8
+		}
+	}
+
+	return string(data)
 }
 
 func readEmailMIMEHeader(r *Reader, lim int64) (MIMEHeader, error) {
@@ -64,8 +123,8 @@ func readEmailMIMEHeader(r *Reader, lim int64) (MIMEHeader, error) {
 			continue
 		}
 
-		// Skip initial spaces in value.
-		value := string(bytes.TrimLeft(v, " \t"))
+		// Skip initial spaces in value and convert to UTF-8.
+		value := DetectAndConvertToUTF8(bytes.TrimLeft(v, " \t"))
 
 		vv := m[key]
 		if vv == nil {

@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gogs/chardet"
 	"github.com/jhillyerd/enmime/v2/internal/coding"
 	inttp "github.com/jhillyerd/enmime/v2/internal/textproto"
 	"github.com/jhillyerd/enmime/v2/mediatype"
 	"github.com/pkg/errors"
+	"github.com/saintfish/chardet"
 )
 
 const (
